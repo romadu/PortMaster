@@ -1,0 +1,57 @@
+#!/bin/bash
+
+if [ -d "/opt/system/Tools/PortMaster/" ]; then
+  controlfolder="/opt/system/Tools/PortMaster"
+elif [ -d "/opt/tools/PortMaster/" ]; then
+  controlfolder="/opt/tools/PortMaster"  
+else
+  controlfolder="/roms/ports/PortMaster"
+fi
+
+source $controlfolder/control.txt
+
+# on my rg351mp with amberelec and the roms on the 2nd sd-card
+directory="/storage/roms"
+
+GAMEDIR="$directory/ports/bstone-aog"
+
+GPTOKEYB_CONFIG="$GAMEDIR/bstone.gptk"
+
+if [[ $LOWRES == 'Y' ]]; then
+    $ESUDO sed -i -E '/vid_width / s/"[^"]+"/"480"/' $GAMEDIR/conf/bibendovsky/bstone/bstone_config.txt
+    $ESUDO sed -i -E '/vid_height / s/"[^"]+"/"320"/' $GAMEDIR/conf/bibendovsky/bstone/bstone_config.txt
+    $ESUDO sed -i '/vid_is_ui_stretched / s/"1"/"0"/' $GAMEDIR/conf/bibendovsky/bstone/bstone_config.txt
+    $ESUDO sed -i '/vid_is_widescreen / s/"1"/"0"/' $GAMEDIR/conf/bibendovsky/bstone/bstone_config.txt
+elif [[ "$(cat /sys/firmware/devicetree/base/model)" == "Anbernic RG552" ]] || [[ -e "/dev/input/by-path/platform-singleadc-joypad-event-joystick" ]]; then
+    $ESUDO sed -i -E '/vid_width / s/"[^"]+"/"1920"/' $GAMEDIR/conf/bibendovsky/bstone/bstone_config.txt
+    $ESUDO sed -i -E '/vid_height / s/"[^"]+"/"1152"/' $GAMEDIR/conf/bibendovsky/bstone/bstone_config.txt
+    $ESUDO sed -i '/vid_is_ui_stretched / s/"0"/"1"/' $GAMEDIR/conf/bibendovsky/bstone/bstone_config.txt
+    $ESUDO sed -i '/vid_is_widescreen / s/"0"/"1"/' $GAMEDIR/conf/bibendovsky/bstone/bstone_config.txt
+elif [[ -e "/dev/input/by-path/platform-odroidgo3-joypad-event-joystick" ]]; then
+    $ESUDO sed -i -E '/vid_width / s/"[^"]+"/"857"/' $GAMEDIR/conf/bibendovsky/bstone/bstone_config.txt
+    $ESUDO sed -i -E '/vid_height / s/"[^"]+"/"480"/' $GAMEDIR/conf/bibendovsky/bstone/bstone_config.txt
+    $ESUDO sed -i '/vid_is_ui_stretched / s/"0"/"1"/' $GAMEDIR/conf/bibendovsky/bstone/bstone_config.txt
+    $ESUDO sed -i '/vid_is_widescreen / s/"0"/"1"/' $GAMEDIR/conf/bibendovsky/bstone/bstone_config.txt
+else
+    $ESUDO sed -i -E '/vid_width / s/"[^"]+"/"640"/' $GAMEDIR/conf/bibendovsky/bstone/bstone_config.txt
+    $ESUDO sed -i -E '/vid_height / s/"[^"]+"/"480"/' $GAMEDIR/conf/bibendovsky/bstone/bstone_config.txt
+    $ESUDO sed -i '/vid_is_ui_stretched / s/"1"/"0"/' $GAMEDIR/conf/bibendovsky/bstone/bstone_config.txt
+    $ESUDO sed -i '/vid_is_widescreen / s/"1"/"0"/' $GAMEDIR/conf/bibendovsky/bstone/bstone_config.txt
+fi
+
+if [[ $ANALOGSTICKS == '1' ]]; then
+    GPTOKEYB_CONFIG="$GAMEDIR/bstone.gptk.leftanalog"  
+fi
+
+cd $GAMEDIR
+
+$ESUDO rm -rf ~/.local/share/bibendovsky
+ln -sfv $GAMEDIR/conf/bibendovsky ~/.local/share/
+
+$ESUDO chmod 666 /dev/tty1
+$ESUDO chmod 666 /dev/uinput
+$GPTOKEYB "bstone" -c "$GPTOKEYB_CONFIG" &
+LD_LIBRARY_PATH="$GAMEDIR/libs" SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig" ./bstone --data_dir $GAMEDIR/gamedata/aliens_of_gold  2>&1 | tee $GAMEDIR/log.txt
+$ESUDO kill -9 $(pidof gptokeyb)
+$ESUDO systemctl restart oga_events &
+printf "\033c" >> /dev/tty1
